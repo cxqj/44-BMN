@@ -117,7 +117,7 @@ class BMN(nn.Module):
         p_mask = np.stack(p_mask, axis=1)  # (100,32)  按列拼接
         return p_mask
 
-   
+    # 构建100x100个可能提议每个提议对于的sampling mask矩阵，每个矩阵的维度为100x32,因此最终的维度为100x32x100x100
     def _get_interp1d_mask(self):
         # generate sample mask for each point in Boundary-Matching Map
         mask_mat = []
