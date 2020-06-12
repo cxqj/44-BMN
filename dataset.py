@@ -92,6 +92,7 @@ class VideoDataSet(data.Dataset):
         """
         
         self.match_map = match_map  # duration is same in row, start is same in col  (10000,2)  起始就是起始点和duration矩阵，说实话就是获得了所有种类的提议
+        # 间隔0.02
         self.anchor_xmin = [self.temporal_gap * (i-0.5) for i in range(self.temporal_scale)]         # [-0.005,0.005,0.015,....,0.985]
         self.anchor_xmax = [self.temporal_gap * (i+0.5) for i in range(1, self.temporal_scale + 1)]  # [0.015,0.025,....1.005]
 
@@ -135,7 +136,7 @@ class VideoDataSet(data.Dataset):
             
         # 相当于建立了一个字典保存所有可能的提议与gt_bbox的IOU值
         gt_iou_map = np.array(gt_iou_map)  # (1,100,100) 其中1表示gt_bbox的个数
-        gt_iou_map = np.max(gt_iou_map, axis=0)  # 如果存在gt_bbox，则选取最大IOU值作为iou_map中的值
+        gt_iou_map = np.max(gt_iou_map, axis=0)  # 如果存在多个gt_bbox，则选取最大IOU值作为iou_map中的值
         gt_iou_map = torch.Tensor(gt_iou_map)
         ##############################################################################################
 
@@ -147,19 +148,20 @@ class VideoDataSet(data.Dataset):
         gt_xmaxs = gt_bbox[:, 1]
         gt_lens = gt_xmaxs - gt_xmins
         gt_len_small = 3 * self.temporal_gap  # np.maximum(self.temporal_gap, self.boundary_ratio * gt_lens)
+        # 间隔0.03
         gt_start_bboxs = np.stack((gt_xmins - gt_len_small / 2, gt_xmins + gt_len_small / 2), axis=1)  # [0.12,0.15]
         gt_end_bboxs = np.stack((gt_xmaxs - gt_len_small / 2, gt_xmaxs + gt_len_small / 2), axis=1)  # [0.85,0.88]
         #####################################################################################################
 
         ##########################################################################################################
         # calculate the ioa for all timestamp
-        # 计算每个预设anchor与gt_bbox起始区域的重叠率(注意不是计算IOU)
+        # 计算每个0.02的小区间与gt_start和gt_end的重叠度
         match_score_start = []  # (100)
         for jdx in range(len(anchor_xmin)):
             match_score_start.append(np.max(
                 ioa_with_anchors(anchor_xmin[jdx], anchor_xmax[jdx], gt_start_bboxs[:, 0], gt_start_bboxs[:, 1])))
         match_score_end = []   # (100)
-        # 计算每个预设anchor与gt_bbox结束区域的重叠率(注意不是计算IOU)
+        
         for jdx in range(len(anchor_xmin)):
             match_score_end.append(np.max(
                 ioa_with_anchors(anchor_xmin[jdx], anchor_xmax[jdx], gt_end_bboxs[:, 0], gt_end_bboxs[:, 1])))
