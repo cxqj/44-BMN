@@ -23,21 +23,26 @@ def train_BMN(data_loader, model, optimizer, epoch, bm_mask):
     epoch_tem_loss = 0
     epoch_loss = 0
     for n_iter, (input_data, label_confidence, label_start, label_end) in enumerate(data_loader):
-        input_data = input_data.cuda()
-        label_start = label_start.cuda()
-        label_end = label_end.cuda()
-        label_confidence = label_confidence.cuda()
+        input_data = input_data.cuda()  #(16,400,100)
+        label_start = label_start.cuda()  #(16,100)
+        label_end = label_end.cuda()  #(16,100)
+        label_confidence = label_confidence.cuda()  #(16,100,100)
+        # (16,2,100,100),(16,100),(16,100)
         confidence_map, start, end = model(input_data)
+        
+        # loss, tem_loss, pem_reg_loss, pem_cls_loss
         loss = bmn_loss_func(confidence_map, start, end, label_confidence, label_start, label_end, bm_mask.cuda())
-        optimizer.zero_grad()
-        loss[0].backward()
-        optimizer.step()
-
+        
         epoch_pemreg_loss += loss[2].cpu().detach().numpy()
         epoch_pemclr_loss += loss[3].cpu().detach().numpy()
         epoch_tem_loss += loss[1].cpu().detach().numpy()
         epoch_loss += loss[0].cpu().detach().numpy()
 
+        optimizer.zero_grad()
+        loss[0].backward()
+        optimizer.step()
+
+        
     print(
         "BMN training loss(epoch %d): tem_loss: %.03f, pem class_loss: %.03f, pem reg_loss: %.03f, total_loss: %.03f" % (
             epoch, epoch_tem_loss / (n_iter + 1),
@@ -46,6 +51,7 @@ def train_BMN(data_loader, model, optimizer, epoch, bm_mask):
             epoch_loss / (n_iter + 1)))
 
 
+# 和训练的过程一致
 def test_BMN(data_loader, model, epoch, bm_mask):
     model.eval()
     best_loss = 1e10
@@ -59,7 +65,7 @@ def test_BMN(data_loader, model, epoch, bm_mask):
         label_end = label_end.cuda()
         label_confidence = label_confidence.cuda()
 
-        confidence_map, start, end = model(input_data)
+        confidence_map, start, end = model(input_data)  
         loss = bmn_loss_func(confidence_map, start, end, label_confidence, label_start, label_end, bm_mask.cuda())
 
         epoch_pemreg_loss += loss[2].cpu().detach().numpy()
@@ -97,7 +103,7 @@ def BMN_Train(opt):
                                               num_workers=8, pin_memory=True)
 
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=opt["step_size"], gamma=opt["step_gamma"])
-    bm_mask = get_mask(opt["temporal_scale"])
+    bm_mask = get_mask(opt["temporal_scale"])  #(100,100)的上三角矩阵
     for epoch in range(opt["train_epochs"]):
         scheduler.step()
         train_BMN(train_loader, model, optimizer, epoch, bm_mask)
@@ -119,7 +125,7 @@ def BMN_inference(opt):
         for idx, input_data in test_loader:
             video_name = test_loader.dataset.video_list[idx[0]]
             input_data = input_data.cuda()
-            confidence_map, start, end = model(input_data)
+            confidence_map, start, end = model(input_data)  #(1,2,100,100),(1,100),(1,100)
 
             #print(start.shape,end.shape,confidence_map.shape)
             start_scores = start[0].detach().cpu().numpy()
