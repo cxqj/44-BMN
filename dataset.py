@@ -17,14 +17,15 @@ class VideoDataSet(data.Dataset):
     def __init__(self, opt, subset="train"):
         self.temporal_scale = opt["temporal_scale"]  # 100
         self.temporal_gap = 1. / self.temporal_scale
-        self.subset = subset
+        self.subset = subset  #train/validation
         self.mode = opt["mode"]
         self.feature_path = opt["feature_path"]
         self.video_info_path = opt["video_info"]
         self.video_anno_path = opt["video_anno"]
         self._getDatasetDict()
         self._get_match_map()
-
+        
+    # 获取标注字典
     def _getDatasetDict(self):
         anno_df = pd.read_csv(self.video_info_path)
         anno_database = load_json(self.video_anno_path)
@@ -36,7 +37,7 @@ class VideoDataSet(data.Dataset):
             if self.subset in video_subset:
                 self.video_dict[video_name] = video_info
         self.video_list = list(self.video_dict.keys())
-        print("%s subset video numbers: %d" % (self.subset, len(self.video_list)))
+        print("%s subset video numbers: %d" % (self.subset, len(self.video_list)))  # train:9649 
 
     def __getitem__(self, index):
         video_data = self._load_file(index)
@@ -49,20 +50,22 @@ class VideoDataSet(data.Dataset):
 
     def _get_match_map(self):
         match_map = []
+        # 遍历每一个时序位置
         for idx in range(self.temporal_scale):
-            tmp_match_window = []
+            tmp_match_window = []  # [[0.0,0.01],[0.0,0.02],.....,[0.0,1.0]]
             xmin = self.temporal_gap * idx
             for jdx in range(1, self.temporal_scale + 1):
                 xmax = xmin + self.temporal_gap * jdx
                 tmp_match_window.append([xmin, xmax])
             match_map.append(tmp_match_window)
-        match_map = np.array(match_map)  # 100x100x2
+        match_map = np.array(match_map)  # 100x100x2  100个时序位置
         match_map = np.transpose(match_map, [1, 0, 2])  # [0,1] [1,2] [2,3].....[99,100]
         match_map = np.reshape(match_map, [-1, 2])  # [0,2] [1,3] [2,4].....[99,101]   # duration x start
         self.match_map = match_map  # duration is same in row, start is same in col
-        self.anchor_xmin = [self.temporal_gap * (i-0.5) for i in range(self.temporal_scale)]
-        self.anchor_xmax = [self.temporal_gap * (i+0.5) for i in range(1, self.temporal_scale + 1)]
+        self.anchor_xmin = [self.temporal_gap * (i-0.5) for i in range(self.temporal_scale)]   # [-0.005,0.005,0.015,....,0.985]
+        self.anchor_xmax = [self.temporal_gap * (i+0.5) for i in range(1, self.temporal_scale + 1)]  # [0.015,0.025,....1.005]
 
+    # 加载视频特征
     def _load_file(self, index):
         video_name = self.video_list[index]
         video_df = pd.read_csv(self.feature_path + "csv_mean_" + str(self.temporal_scale) + "/" + video_name + ".csv")
@@ -71,35 +74,38 @@ class VideoDataSet(data.Dataset):
         video_data = torch.transpose(video_data, 0, 1)
         video_data.float()
         return video_data
-
+    # 获取预设anchor_min和anchor_max与gt_start区域和gt_end区域的重叠率和每一种anchor的iou_map
     def _get_train_label(self, index, anchor_xmin, anchor_xmax):
         video_name = self.video_list[index]
         video_info = self.video_dict[video_name]
-        video_frame = video_info['duration_frame']
-        video_second = video_info['duration_second']
-        feature_frame = video_info['feature_frame']
-        corrected_second = float(feature_frame) / video_frame * video_second  # there are some frames not used
-        video_labels = video_info['annotations']  # the measurement is second, not frame
+        video_frame = video_info['duration_frame']   #1128
+        video_second = video_info['duration_second']  #47.114
+        feature_frame = video_info['feature_frame']  # 1120
+        corrected_second = float(feature_frame) / video_frame * video_second  # there are some frames not used  46.77
+        video_labels = video_info['annotations']  # the measurement is second, not frame  [{'segment':[0.01,37.11],'labels':'waxing skis'}]
 
         ##############################################################################################
         # change the measurement from second to percentage
+        # 计算的是起止时间相对于视频时长的百分比
         gt_bbox = []
         gt_iou_map = []
         for j in range(len(video_labels)):
             tmp_info = video_labels[j]
-            tmp_start = max(min(1, tmp_info['segment'][0] / corrected_second), 0)
-            tmp_end = max(min(1, tmp_info['segment'][1] / corrected_second), 0)
+            tmp_start = max(min(1, tmp_info['segment'][0] / corrected_second), 0)  # 0.00
+            tmp_end = max(min(1, tmp_info['segment'][1] / corrected_second), 0)  # 0.79
             gt_bbox.append([tmp_start, tmp_end])
+            # 计算当前gt_bbox与所有预设anchor的IOU
             tmp_gt_iou_map = iou_with_anchors(
-                self.match_map[:, 0], self.match_map[:, 1], tmp_start, tmp_end)
+                self.match_map[:, 0], self.match_map[:, 1], tmp_start, tmp_end)  #(10000,)
             tmp_gt_iou_map = np.reshape(tmp_gt_iou_map,
-                                        [self.temporal_scale, self.temporal_scale])
+                                        [self.temporal_scale, self.temporal_scale])  #(100,100)
             gt_iou_map.append(tmp_gt_iou_map)
-        gt_iou_map = np.array(gt_iou_map)
-        gt_iou_map = np.max(gt_iou_map, axis=0)
+        gt_iou_map = np.array(gt_iou_map)  # (1,100,100) 其中1表示gt_bbox的个数
+        gt_iou_map = np.max(gt_iou_map, axis=0)  # 选取最大值？？
         gt_iou_map = torch.Tensor(gt_iou_map)
         ##############################################################################################
 
+        # 将gt的起止时间扩大为一个范围
         ####################################################################################################
         # generate R_s and R_e
         gt_bbox = np.array(gt_bbox)
@@ -107,17 +113,19 @@ class VideoDataSet(data.Dataset):
         gt_xmaxs = gt_bbox[:, 1]
         gt_lens = gt_xmaxs - gt_xmins
         gt_len_small = 3 * self.temporal_gap  # np.maximum(self.temporal_gap, self.boundary_ratio * gt_lens)
-        gt_start_bboxs = np.stack((gt_xmins - gt_len_small / 2, gt_xmins + gt_len_small / 2), axis=1)
-        gt_end_bboxs = np.stack((gt_xmaxs - gt_len_small / 2, gt_xmaxs + gt_len_small / 2), axis=1)
+        gt_start_bboxs = np.stack((gt_xmins - gt_len_small / 2, gt_xmins + gt_len_small / 2), axis=1)  # [0.12,0.15]
+        gt_end_bboxs = np.stack((gt_xmaxs - gt_len_small / 2, gt_xmaxs + gt_len_small / 2), axis=1)  # [0.85,0.88]
         #####################################################################################################
 
         ##########################################################################################################
         # calculate the ioa for all timestamp
-        match_score_start = []
+        # 计算每个预设anchor与gt_bbox起始区域的重叠率(注意不是计算IOU)
+        match_score_start = []  # (100)
         for jdx in range(len(anchor_xmin)):
             match_score_start.append(np.max(
                 ioa_with_anchors(anchor_xmin[jdx], anchor_xmax[jdx], gt_start_bboxs[:, 0], gt_start_bboxs[:, 1])))
-        match_score_end = []
+        match_score_end = []   # (100)
+        # 计算每个预设anchor与gt_bbox结束区域的重叠率(注意不是计算IOU)
         for jdx in range(len(anchor_xmin)):
             match_score_end.append(np.max(
                 ioa_with_anchors(anchor_xmin[jdx], anchor_xmax[jdx], gt_end_bboxs[:, 0], gt_end_bboxs[:, 1])))
