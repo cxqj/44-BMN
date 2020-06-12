@@ -137,7 +137,7 @@ class BMN(nn.Module):
         mask_mat = np.stack(mask_mat, axis=3)  # (100,32,100,100) 每个时刻每种时长的提议采样32个点
         mask_mat = mask_mat.astype(np.float32)
         
-        # 这就是网络主要要学习的东西
+        # 这就是网络主要要学习的东西,sample_mask的本质起始就是对所有可能的提议截取固定长度的特征并对特征进行加权
         self.sample_mask = nn.Parameter(torch.Tensor(mask_mat).view(self.tscale, -1), requires_grad=False)  #(100,320000)
 
 
