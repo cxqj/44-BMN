@@ -62,7 +62,7 @@ class VideoDataSet(data.Dataset):
         match_map = np.transpose(match_map, [1, 0, 2])  # [0,1] [1,2] [2,3].....[99,100]
         match_map = np.reshape(match_map, [-1, 2])  # [0,2] [1,3] [2,4].....[99,101]   # duration x start
         """
-        match_map数据格式:
+        match_map数据格式（所有列的起始时间相同，所有行的持续时间相同）:
              0.0       0.01
              0.01      0.02
              0.02      0.03
@@ -91,7 +91,7 @@ class VideoDataSet(data.Dataset):
           ---------------------
         """
         
-        self.match_map = match_map  # duration is same in row, start is same in col  (10000,2)  起始就是起始点和duration矩阵
+        self.match_map = match_map  # duration is same in row, start is same in col  (10000,2)  起始就是起始点和duration矩阵，说实话就是获得了所有种类的提议
         self.anchor_xmin = [self.temporal_gap * (i-0.5) for i in range(self.temporal_scale)]         # [-0.005,0.005,0.015,....,0.985]
         self.anchor_xmax = [self.temporal_gap * (i+0.5) for i in range(1, self.temporal_scale + 1)]  # [0.015,0.025,....1.005]
 
@@ -132,8 +132,10 @@ class VideoDataSet(data.Dataset):
             tmp_gt_iou_map = np.reshape(tmp_gt_iou_map,
                                         [self.temporal_scale, self.temporal_scale])  #(100,100)
             gt_iou_map.append(tmp_gt_iou_map)
+            
+        # 相当于建立了一个字典保存所有可能的提议与gt_bbox的IOU值
         gt_iou_map = np.array(gt_iou_map)  # (1,100,100) 其中1表示gt_bbox的个数
-        gt_iou_map = np.max(gt_iou_map, axis=0)  # 选取最大值？？
+        gt_iou_map = np.max(gt_iou_map, axis=0)  # 如果存在gt_bbox，则选取最大IOU值作为iou_map中的值
         gt_iou_map = torch.Tensor(gt_iou_map)
         ##############################################################################################
 
