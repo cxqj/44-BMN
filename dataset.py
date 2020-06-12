@@ -32,7 +32,7 @@ class VideoDataSet(data.Dataset):
         self.video_dict = {}
         for i in range(len(anno_df)):
             video_name = anno_df.video.values[i]
-            video_info = anno_database[video_name]
+            video_info = anno_database[video_name]  # duration_second, duration_frame,annotations, feature_frame
             video_subset = anno_df.subset.values[i]
             if self.subset in video_subset:
                 self.video_dict[video_name] = video_info
@@ -91,7 +91,7 @@ class VideoDataSet(data.Dataset):
           ---------------------
         """
         
-        self.match_map = match_map  # duration is same in row, start is same in col  (10000,2)  起始就是起始点和duration矩阵，说实话就是获得了所有种类的提议
+        self.match_map = match_map  # duration is same in row, start is same in col  (10000,2) 
         # 间隔0.02
         self.anchor_xmin = [self.temporal_gap * (i-0.5) for i in range(self.temporal_scale)]         # [-0.005,0.005,0.015,....,0.985]
         self.anchor_xmax = [self.temporal_gap * (i+0.5) for i in range(1, self.temporal_scale + 1)]  # [0.015,0.025,....1.005]
