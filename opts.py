@@ -60,7 +60,7 @@ def parse_opt():
     parser.add_argument(
         '--num_sample',
         type=int,
-        default=32)  # 采样点的个数为32
+        default=32)  # 每个时序提议的特征采样点数
     parser.add_argument(
         '--num_sample_perbin',
         type=int,
