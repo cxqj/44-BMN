@@ -75,13 +75,18 @@ class BMN(nn.Module):
         confidence_map = self.x_3d_p(confidence_map).squeeze(2)  #(16,512,100,100)
         confidence_map = self.x_2d_p(confidence_map)  #(16,2,100,100)
         return confidence_map, start, end
-
+    
+    
+    # match_layer的过程可以这么理解，对于256x100的特征矩阵，某个预设提议对应的mask权重矩阵为100x32
+    # 通过两个矩阵的点乘实现了插值操作。具体来说，对于特征矩阵的某一行(1x100)和mask权重矩阵的某一列(100x1)实质上是对特征矩阵进行了加权求和操作
     def _boundary_matching_layer(self, x):  #(16,256,100)
         input_size = x.size()
         # (16,256,100)x(100,320000)-->(16,256,320000)-->(16,256,32,100,100)
         out = torch.matmul(x, self.sample_mask).reshape(input_size[0],input_size[1],self.num_sample,self.tscale,self.tscale)
         return out
-
+    
+    # 对于某一个提议，将该提议等间距划分为32*3 = 96个采样点，然后每三个采样点作为一个bin
+    # 对于bin中的每一个采样点，分别对采样点时序位置进行向上和向下取整(既可以获得整数的位置)，对于每个位置按照论文中的公式1计算mask权重
     # seg_xmin = -0.5  seg_xmax = 0.5  tscale= 100 num_sample=32  num_sample_perbin = 3
     def _get_interp1d_bin_mask(self, seg_xmin, seg_xmax, tscale, num_sample, num_sample_perbin):
         # generate sample mask for a boundary-matching pair
@@ -112,6 +117,7 @@ class BMN(nn.Module):
         p_mask = np.stack(p_mask, axis=1)  # (100,32)  按列拼接
         return p_mask
 
+   
     def _get_interp1d_mask(self):
         # generate sample mask for each point in Boundary-Matching Map
         mask_mat = []
