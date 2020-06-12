@@ -18,6 +18,7 @@ class BMN(nn.Module):
         self.hidden_dim_2d = 128
         self.hidden_dim_3d = 512
 
+        # 构建sampling mask权重矩阵
         self._get_interp1d_mask()
 
         # Base Module
@@ -68,10 +69,9 @@ class BMN(nn.Module):
         base_feature = self.x_1d_b(x)  # (16,256,100)
         start = self.x_1d_s(base_feature).squeeze(1)  #(16,100)
         end = self.x_1d_e(base_feature).squeeze(1)  #(16,100)
+        
         confidence_map = self.x_1d_p(base_feature)  # (16,256,100)
-        
-        confidence_map = self._boundary_matching_layer(confidence_map)  # (16,256,32,100,100)
-        
+        confidence_map = self._boundary_matching_layer(confidence_map)  # (16,256,32,100,100) 
         confidence_map = self.x_3d_p(confidence_map).squeeze(2)  #(16,512,100,100)
         confidence_map = self.x_2d_p(confidence_map)  #(16,2,100,100)
         return confidence_map, start, end
