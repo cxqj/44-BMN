@@ -61,8 +61,38 @@ class VideoDataSet(data.Dataset):
         match_map = np.array(match_map)  # 100x100x2  100个时序位置
         match_map = np.transpose(match_map, [1, 0, 2])  # [0,1] [1,2] [2,3].....[99,100]
         match_map = np.reshape(match_map, [-1, 2])  # [0,2] [1,3] [2,4].....[99,101]   # duration x start
-        self.match_map = match_map  # duration is same in row, start is same in col
-        self.anchor_xmin = [self.temporal_gap * (i-0.5) for i in range(self.temporal_scale)]   # [-0.005,0.005,0.015,....,0.985]
+        """
+        match_map数据格式:
+             0.0       0.01
+             0.01      0.02
+             0.02      0.03
+               :        :
+             0.99      1.0
+          ---------------------
+             0.0       0.02
+             0.01      0.03
+             0.02      0.04
+               :        :
+             0.99      1.01
+         ----------------------
+             0.0       0.03
+             0.01      0.04
+             0.02      0.05
+               :        :
+             0.99      1.02
+          ---------------------
+               ........
+          ---------------------
+             0.0       1.0
+             0.01      1.01
+             0.02      1.02
+               :        :
+             0.99      1.99
+          ---------------------
+        """
+        
+        self.match_map = match_map  # duration is same in row, start is same in col  (10000,2)  起始就是起始点和duration矩阵
+        self.anchor_xmin = [self.temporal_gap * (i-0.5) for i in range(self.temporal_scale)]         # [-0.005,0.005,0.015,....,0.985]
         self.anchor_xmax = [self.temporal_gap * (i+0.5) for i in range(1, self.temporal_scale + 1)]  # [0.015,0.025,....1.005]
 
     # 加载视频特征
@@ -74,6 +104,8 @@ class VideoDataSet(data.Dataset):
         video_data = torch.transpose(video_data, 0, 1)
         video_data.float()
         return video_data
+    
+    
     # 获取预设anchor_min和anchor_max与gt_start区域和gt_end区域的重叠率和每一种anchor的iou_map
     def _get_train_label(self, index, anchor_xmin, anchor_xmax):
         video_name = self.video_list[index]
