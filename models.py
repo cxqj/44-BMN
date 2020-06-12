@@ -149,3 +149,7 @@ if __name__ == '__main__':
     input=torch.randn(2,400,100)
     a,b,c=model(input)
     print(a.shape,b.shape,c.shape)
+    
+    
+    
+    
