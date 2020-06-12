@@ -24,11 +24,12 @@ def parse_opt():
     parser.add_argument(
         '--train_epochs',
         type=int,
-        default=9)
+        default=9)  # 只需要训练9个epoch??
     parser.add_argument(
         '--batch_size',
         type=int,
         default=16)
+    # 没明白啥意思
     parser.add_argument(
         '--step_size',
         type=int,
@@ -59,7 +60,7 @@ def parse_opt():
     parser.add_argument(
         '--num_sample',
         type=int,
-        default=32)
+        default=32)  # 采样点的个数为32
     parser.add_argument(
         '--num_sample_perbin',
         type=int,
