@@ -130,6 +130,13 @@ class VideoDataSet(data.Dataset):
             # 计算当前gt_bbox与所有预设anchor的IOU
             tmp_gt_iou_map = iou_with_anchors(
                 self.match_map[:, 0], self.match_map[:, 1], tmp_start, tmp_end)  #(10000,)
+            # 这里reshape之后正好变成了行为不同的起止时间，列为不同持续时长的形式
+            # 例如对于矩阵：
+            #     [[1]
+            #      [2]      ------>  [[1,2],
+            #                         [3,4]]
+            #      [3]
+            #      [4]]
             tmp_gt_iou_map = np.reshape(tmp_gt_iou_map,
                                         [self.temporal_scale, self.temporal_scale])  #(100,100)
             gt_iou_map.append(tmp_gt_iou_map)
