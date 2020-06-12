@@ -62,18 +62,19 @@ class BMN(nn.Module):
             nn.Sigmoid()
         )
 
-    def forward(self, x):
-        base_feature = self.x_1d_b(x)
-        start = self.x_1d_s(base_feature).squeeze(1)
-        end = self.x_1d_e(base_feature).squeeze(1)
-        confidence_map = self.x_1d_p(base_feature)
-        confidence_map = self._boundary_matching_layer(confidence_map)
-        confidence_map = self.x_3d_p(confidence_map).squeeze(2)
-        confidence_map = self.x_2d_p(confidence_map)
+    def forward(self, x):  #(16,400,100)
+        base_feature = self.x_1d_b(x)  # (16,256,100)
+        start = self.x_1d_s(base_feature).squeeze(1)  #(16,100)
+        end = self.x_1d_e(base_feature).squeeze(1)  #(16,100)
+        confidence_map = self.x_1d_p(base_feature)  # (16,256,100)
+        confidence_map = self._boundary_matching_layer(confidence_map)  # (16,256,32,100,100)
+        confidence_map = self.x_3d_p(confidence_map).squeeze(2)  #(16,512,100,100)
+        confidence_map = self.x_2d_p(confidence_map)  #(16,2,100,100)
         return confidence_map, start, end
 
-    def _boundary_matching_layer(self, x):
+    def _boundary_matching_layer(self, x):  #(16,256,100)
         input_size = x.size()
+        # (16,256,100)x(100,320000)-->(16,256,320000)-->(16,256,32,100,100)
         out = torch.matmul(x, self.sample_mask).reshape(input_size[0],input_size[1],self.num_sample,self.tscale,self.tscale)
         return out
 
