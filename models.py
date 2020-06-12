@@ -51,6 +51,8 @@ class BMN(nn.Module):
             nn.Conv3d(self.hidden_dim_1d, self.hidden_dim_3d, kernel_size=(self.num_sample, 1, 1)),   # 256-->512
             nn.ReLU(inplace=True)
         )
+        
+        # 用2D卷积来捕获更多的上下文
         self.x_2d_p = nn.Sequential(
             nn.Conv2d(self.hidden_dim_3d, self.hidden_dim_2d, kernel_size=1),  # 512-->128
             nn.ReLU(inplace=True),
@@ -67,7 +69,9 @@ class BMN(nn.Module):
         start = self.x_1d_s(base_feature).squeeze(1)  #(16,100)
         end = self.x_1d_e(base_feature).squeeze(1)  #(16,100)
         confidence_map = self.x_1d_p(base_feature)  # (16,256,100)
+        
         confidence_map = self._boundary_matching_layer(confidence_map)  # (16,256,32,100,100)
+        
         confidence_map = self.x_3d_p(confidence_map).squeeze(2)  #(16,512,100,100)
         confidence_map = self.x_2d_p(confidence_map)  #(16,2,100,100)
         return confidence_map, start, end
@@ -98,6 +102,7 @@ class BMN(nn.Module):
                 # modf() 方法返回x的整数部分与小数部分，两部分的数值符号与x相同，整数部分以浮点型表示。
                 # 例如：math.modf(100.12) :  (0.12000000000000455, 100.0)
                 sample_decimal, sample_down = math.modf(sample)  #向下取整
+                # 如果采样点位于[0-99],那么左侧的值为1-小数，右侧的值为小数
                 if int(sample_down) <= (tscale - 1) and int(sample_down) >= 0:
                     bin_vector[int(sample_down)] += 1 - sample_decimal
                 if int(sample_upper) <= (tscale - 1) and int(sample_upper) >= 0:
@@ -129,8 +134,10 @@ class BMN(nn.Module):
                 mask_mat_vector.append(p_mask)
             mask_mat_vector = np.stack(mask_mat_vector, axis=2)  # (100,32,100)
             mask_mat.append(mask_mat_vector)
-        mask_mat = np.stack(mask_mat, axis=3)  # (100,32,100,100)
+        mask_mat = np.stack(mask_mat, axis=3)  # (100,32,100,100) 每个时刻每种时长的提议采样32个点
         mask_mat = mask_mat.astype(np.float32)
+        
+        # 这就是网络主要要学习的东西
         self.sample_mask = nn.Parameter(torch.Tensor(mask_mat).view(self.tscale, -1), requires_grad=False)  #(100,320000)
 
 
