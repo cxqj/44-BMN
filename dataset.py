@@ -153,6 +153,7 @@ class VideoDataSet(data.Dataset):
         gt_end_bboxs = np.stack((gt_xmaxs - gt_len_small / 2, gt_xmaxs + gt_len_small / 2), axis=1)  # [0.85,0.88]
         #####################################################################################################
 
+        # 不明白为啥label可以这样构建
         ##########################################################################################################
         # calculate the ioa for all timestamp
         # 计算每个0.02的小区间与gt_start和gt_end的重叠度
