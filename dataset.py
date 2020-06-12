@@ -37,7 +37,7 @@ class VideoDataSet(data.Dataset):
             if self.subset in video_subset:
                 self.video_dict[video_name] = video_info
         self.video_list = list(self.video_dict.keys())
-        print("%s subset video numbers: %d" % (self.subset, len(self.video_list)))  # train:9649 
+        print("%s subset video numbers: %d" % (self.subset, len(self.video_list)))  # train:9649  test:4728
 
     def __getitem__(self, index):
         video_data = self._load_file(index)
