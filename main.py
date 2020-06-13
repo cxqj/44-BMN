@@ -120,7 +120,7 @@ def BMN_inference(opt):
     test_loader = torch.utils.data.DataLoader(VideoDataSet(opt, subset="validation"),
                                               batch_size=1, shuffle=False,
                                               num_workers=8, pin_memory=True, drop_last=False)
-    tscale = opt["temporal_scale"]
+    tscale = opt["temporal_scale"]  # 100
     with torch.no_grad():
         for idx, input_data in test_loader:
             video_name = test_loader.dataset.video_list[idx[0]]
@@ -128,26 +128,27 @@ def BMN_inference(opt):
             confidence_map, start, end = model(input_data)  #(1,2,100,100),(1,100),(1,100)
 
             #print(start.shape,end.shape,confidence_map.shape)
-            start_scores = start[0].detach().cpu().numpy()
-            end_scores = end[0].detach().cpu().numpy()
-            clr_confidence = (confidence_map[0][1]).detach().cpu().numpy()
-            reg_confidence = (confidence_map[0][0]).detach().cpu().numpy()
+            start_scores = start[0].detach().cpu().numpy()  # (100,)
+            end_scores = end[0].detach().cpu().numpy()  # (100,)
+            clr_confidence = (confidence_map[0][1]).detach().cpu().numpy()  # (100,100)
+            reg_confidence = (confidence_map[0][0]).detach().cpu().numpy()  # (100,100)
 
+            # 获取得分的峰值
             max_start = max(start_scores)
             max_end = max(end_scores)
 
             ####################################################################################################
             # generate the set of start points and end points
-            start_bins = np.zeros(len(start_scores))
-            start_bins[0] = 1  # [1,0,0...,0,1] 首末两帧
+            start_bins = np.zeros(len(start_scores))  # [0,0,0,....,0] 100个时序点
+            start_bins[0] = 1   # 将第一个时序点置为1
             for idx in range(1, tscale - 1):
                 if start_scores[idx] > start_scores[idx + 1] and start_scores[idx] > start_scores[idx - 1]:
                     start_bins[idx] = 1
                 elif start_scores[idx] > (0.5 * max_start):
                     start_bins[idx] = 1
 
-            end_bins = np.zeros(len(end_scores))
-            end_bins[-1] = 1
+            end_bins = np.zeros(len(end_scores))  
+            end_bins[-1] = 1   # 将最后一个时序点置为1
             for idx in range(1, tscale - 1):
                 if end_scores[idx] > end_scores[idx + 1] and end_scores[idx] > end_scores[idx - 1]:
                     end_bins[idx] = 1
@@ -158,8 +159,9 @@ def BMN_inference(opt):
             #########################################################################
             # 遍历起始分界点与结束分界点的组合
             new_props = []
-            for idx in range(tscale):
-                for jdx in range(tscale):
+            # 相当于遍历每种提议时长的每个时间点
+            for idx in range(tscale): # 用于索引duration，对于某一个idx，其对应提议的时长都相同
+                for jdx in range(tscale):  # 用于遍历100时间点
                     start_index = jdx
                     end_index = start_index + idx+1
                     if end_index < tscale and start_bins[start_index] == 1 and end_bins[end_index] == 1:
