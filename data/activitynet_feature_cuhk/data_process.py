@@ -71,19 +71,24 @@ def poolData(data,videoAnno,num_prop=100,num_bin=1,num_sample_bin=3,pool_type="m
         video_feature=np.stack([data]*num_prop)
         video_feature=np.reshape(video_feature,[num_prop,400])
         return video_feature
-
+ 
+    # 构建一维线性插值函数，沿插值轴的y长度必须等于x的长度。
     x=[st/2+ii*st for ii in range(len(data))]
     f=scipy.interpolate.interp1d(x,data,axis=0)
         
     video_feature=[]
-    zero_sample=np.zeros(num_bin*400)
-    tmp_anchor_xmin=[1.0/num_prop*i for i in range(num_prop)]
-    tmp_anchor_xmax=[1.0/num_prop*i for i in range(1,num_prop+1)]        
+    zero_sample=np.zeros(num_bin*400)  # (400,)
+   
+    tmp_anchor_xmin=[1.0/num_prop*i for i in range(num_prop)]        # [0.0,0.01,.....,0.99]
+    tmp_anchor_xmax=[1.0/num_prop*i for i in range(1,num_prop+1)]    # [0.1,0.02,.....,1.00]     
     
-    num_sample=num_bin*num_sample_bin
+    num_sample=num_bin*num_sample_bin  # 每个区间采样三个点
+    
+    # 遍历100份区间，并对每一个区间进行mean pool
     for idx in range(num_prop):
-        xmin=max(x[0]+0.0001,tmp_anchor_xmin[idx]*corrected_second)
-        xmax=min(x[-1]-0.0001,tmp_anchor_xmax[idx]*corrected_second)
+        # 限制时间点在采样区间内
+        xmin=max(x[0]+0.0001,tmp_anchor_xmin[idx]*corrected_second)  # 0.23
+        xmax=min(x[-1]-0.0001,tmp_anchor_xmax[idx]*corrected_second) # 2.13
         if xmax<x[0]:
             #print "fuck"
             video_feature.append(zero_sample)
@@ -92,21 +97,23 @@ def poolData(data,videoAnno,num_prop=100,num_bin=1,num_sample_bin=3,pool_type="m
             video_feature.append(zero_sample)
             continue
             
-        plen=(xmax-xmin)/(num_sample-1)
-        x_new=[xmin+plen*ii for ii in range(num_sample)]
-        y_new=f(x_new)
+        plen=(xmax-xmin)/(num_sample-1)  # 将xmax-xmin均分为num_sample-1   0.93
+        # 创建采样点
+        x_new=[xmin+plen*ii for ii in range(num_sample)]  # [0.26,1.19,2.13]
+        # 用插值函数拟合结果
+        y_new=f(x_new)  # (3,2048)
         y_new_pool=[]
         for b in range(num_bin):
             tmp_y_new=y_new[num_sample_bin*b:num_sample_bin*(b+1)]
             if pool_type=="mean":
-                tmp_y_new=np.mean(y_new,axis=0)
+                tmp_y_new=np.mean(y_new,axis=0)  # (2048,)
             elif pool_type=="max":
                 tmp_y_new=np.max(y_new,axis=0)
             y_new_pool.append(tmp_y_new)
-        y_new_pool=np.stack(y_new_pool)
-        y_new_pool=np.reshape(y_new_pool,[-1])
+        y_new_pool=np.stack(y_new_pool)  # (1,2048)
+        y_new_pool=np.reshape(y_new_pool,[-1])  # (2048,)
         video_feature.append(y_new_pool)
-    video_feature=np.stack(video_feature)
+    video_feature=np.stack(video_feature)  # (100,2048)
     return video_feature
 
 videoDict=getDatasetDict()
